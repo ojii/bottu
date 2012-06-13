@@ -11,7 +11,7 @@ MODE_RE = re.compile(r'(?:(?P<op>@)|(?P<voice>\+))?(?P<nick>[a-zA-Z0-9][a-zA-Z0-
 
 
 def split_user_mode(user):
-    gd = MODE_RE.match(user)
+    gd = MODE_RE.match(user).groupdict()
     nick = gd['nick']
     if gd['op']:
         return nick, flags.OPERATOR
