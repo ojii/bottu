@@ -9,29 +9,6 @@ from bottu.environment import Environment
 from bottu.plugins import load_plugins, Plugin
 
 
-class DummyStorage(object):
-    def __init__(self):
-        log.msg("DummyStorage used, NO DATA IS ACTUALLY STORED!")
-        self.data = defaultdict(dict)
-
-    def store(self, namespace, key, value):
-        self.data[namespace][key] = value
-        return True
-
-    def get(self, namespace, key, default=None):
-        return self.data[namespace].get(key, default)
-
-    def delete(self, namespace, key):
-        try:
-            del self.data[namespace][key]
-            return True
-        except KeyError:
-            return False
-
-    def keys(self, namespace):
-        return self.data[namespace].keys()
-
-
 class RedisStorage(object):
     def __init__(self, app):
         import redis
@@ -71,10 +48,7 @@ class Application(object):
         load_plugins(self)
         log.msg("All plugins loaded")
         log.msg("Attaching storage")
-        if self.redis_dsn:
-            self.storage = RedisStorage(self)
-        else:
-            self.storage = DummyStorage()
+        self.storage = RedisStorage(self)
         log.msg("Attached storage")
 
     def bind_event(self, name, callback, plugin):
