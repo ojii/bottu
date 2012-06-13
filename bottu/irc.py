@@ -7,13 +7,14 @@ from twisted.words.protocols.irc import IRCClient
 from twisted.python import log
 
 
-MODE_RE = re.compile(r'(?:(?P<op>@)|(?P<voice>\+))?(?P<nick>[a-zA-Z0-9\|][a-zA-Z0-9_\|-]*)')
+MODE_RE = re.compile(r'(?:(?P<op>@)|(?P<voice>\+))?(?P<nick>.+)')
 
 
 def split_user_mode(user):
-    gd = MODE_RE.match(user).groupdict()
-    if not gd:
+    match = MODE_RE.match(user)
+    if not match:
         return flags.ALL
+    gd = match.groupdict()
     nick = gd['nick']
     if gd['op']:
         return nick, flags.OPERATOR
