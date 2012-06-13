@@ -15,7 +15,7 @@ class Permission(object):
             log.msg("No user, no idea how this happened, deny permission.")
             return False
         log.msg("Checking user level %s against default %s" % (env.user.level, self.default))
-        if isinstance(env.user.level, self.default): # default guard
+        if issubclass(env.user.level, self.default): # default guard
             log.msg("User matches default permission level")
             return True
         key = self.key(env.user.name)
