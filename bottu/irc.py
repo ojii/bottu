@@ -115,8 +115,10 @@ class BottuClient(IRCClient):
             nick, mode = split_user_mode(user)
             self.user_mode_cache[nick] = mode
 
-    def userJoined(self, user, channel):
-        log.msg("User %r joined %r" % (user, channel))
+    def userJoined(self, rawuser, rawchannel):
+        log.msg("User %r joined %r" % (rawuser, rawchannel))
+        channel = Channel(self, rawchannel)
+        user = User(self, rawuser)
         self.app.fire_event('user_joined', channel=channel, user=user)
 
     def userRenamed(self, old, new):
