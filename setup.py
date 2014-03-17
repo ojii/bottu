@@ -13,7 +13,6 @@ setup(
         'PyYAML==3.10',
         'Twisted==12.1.0',
         'argparse==1.2.1',
-        'distribute==0.6.24',
         'wsgiref==0.1.2',
         'zope.interface==4.0.1',
         'redis',
