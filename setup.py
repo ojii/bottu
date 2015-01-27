@@ -11,10 +11,10 @@ setup(
     description='',
     install_requires=[
         'PyYAML==3.10',
-        'Twisted==12.1.0',
+        'Twisted',
         'argparse==1.2.1',
         'wsgiref==0.1.2',
-        'zope.interface==4.0.1',
+        'zope.interface',
         'redis',
     ],
     entry_points = {
