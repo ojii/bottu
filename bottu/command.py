@@ -13,13 +13,19 @@ class IRCArgumentParser(ArgumentParser):
         raise ArgumentParserError(message)
 
 
-
 class Command(object):
-    def __init__(self, plugin, name, help_text):
-        self.plugin= plugin
+    def __init__(self, plugin, name, help_text, prefix):
+        self.plugin = plugin
         self.name = name
         self.help_text = help_text
-        self.arg_parser = IRCArgumentParser()
+        self.arg_parser = IRCArgumentParser(
+            add_help=False,
+            description=self.help_text,
+            prog='{prefix}{name}'.format(
+                prefix=prefix,
+                name=name,
+            )
+        )
         self.guards = []
         self.callbacks = []
 

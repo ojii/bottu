@@ -29,7 +29,8 @@ class RedisStorage(object):
 
 
 class Application(object):
-    def __init__(self, name, channels, network, port, redis_dsn, command_prefix='!', pluginconf=None):
+    def __init__(self, name, channels, network, port, redis_dsn,
+                 command_prefix='!', pluginconf=None):
         log.msg("Initializing")
         self.name = name
         self.channels = channels

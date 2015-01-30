@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-namespace
-from contextlib import contextmanager
-
-
 class Environment(object):
     def __init__(self, app, plugin, user, channel):
         self.app = app

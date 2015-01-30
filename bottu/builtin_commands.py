@@ -3,8 +3,26 @@ from bottu.environment import Environment
 from bottu.irc import User
 
 
-def help(env, key=None):
-    pass
+def help(env, command=None):
+    if command:
+        try:
+            cmd = env.app.commands[command]
+        except KeyError:
+            env.msg("Command not found: %s" % command)
+            return
+        lines = (
+            line.rstrip()
+            for line in cmd.arg_parser.format_help().split('\n')
+            if line.strip()
+        )
+        for line in lines:
+            env.msg(line)
+    else:
+        available_commands = sorted(env.app.commands.keys())
+        env.msg("Available commands: {commands}".format(
+            commands=', '.join(available_commands)
+        ))
+
 
 def grant(env, user, permission):
     if permission == '*':
@@ -19,6 +37,7 @@ def grant(env, user, permission):
             return
         env.msg("Granted %s permission %s" % (user, perm))
 
+
 def revoke(env, user, permission):
     if permission == '*':
         permissions = env.app.permissions.keys()
@@ -32,16 +51,23 @@ def revoke(env, user, permission):
             return
         env.msg("Revoked %s permission %s" % (user, perm))
 
+
 def permissions(env, username):
     perms = []
-    userenv = Environment(env.app, env.plugin, User(env.user.client, username), None)
+    userenv = Environment(
+        env.app, env.plugin, User(env.user.client, username), None
+    )
     for permission in env.app.permissions.values():
         if permission.check(userenv):
             perms.append(permission.name)
     env.msg("%s has following permissions: %s" % (username, ', '.join(perms)))
 
+
 def listperms(env):
-    env.msg("Available permissions: %s" % ', '.join(env.app.permissions.keys()))
+    env.msg(
+        "Available permissions: %s" % ', '.join(env.app.permissions.keys())
+    )
+
 
 def register(app):
     #help_plugin = app.add_plugin("Help")
@@ -60,11 +86,22 @@ def register(app):
     revoke_cmd.guard(admin)
     revoke_cmd.bind(revoke)
 
-    deny_cmd = perms_plugin.add_command('permissions', 'Show what permissions a user has')
+    deny_cmd = perms_plugin.add_command(
+        'permissions',
+        'Show what permissions a user has'
+    )
     deny_cmd.add_argument('username')
     deny_cmd.guard(admin)
     deny_cmd.bind(permissions)
 
-    listperms_cmd = perms_plugin.add_command('listperms', 'Show available permissions')
+    listperms_cmd = perms_plugin.add_command(
+        'listperms',
+        'Show available permissions'
+    )
     listperms_cmd.guard(admin)
     listperms_cmd.bind(listperms)
+
+    help_plugin = app.add_plugin("Help")
+    help_cmd = help_plugin.add_command('help', 'Displays help about commands')
+    help_cmd.add_argument('command', default=None, nargs='?')
+    help_cmd.bind(help)

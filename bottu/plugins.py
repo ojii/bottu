@@ -23,7 +23,6 @@
 # ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-from functools import update_wrapper
 from bottu import flags
 from bottu.command import Command
 from bottu.permissions import Permission
@@ -38,7 +37,7 @@ class Plugin(object):
     def add_command(self, name, help_text):
         if name in self.app.commands:
             raise ValueError("Command with name %r already registered." % name)
-        command = Command(self, name, help_text)
+        command = Command(self, name, help_text, self.app.command_prefix)
         self.app.commands[name] = command
         return command
 
