@@ -23,16 +23,24 @@
 # ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import pkg_resources
+
 from bottu import flags
 from bottu.command import Command
 from bottu.permissions import Permission
-import pkg_resources
 
 
 class Plugin(object):
     def __init__(self, app, name):
         self.app = app
         self.name = name
+        self.active = True
+
+    def activate(self):
+        self.active = True
+
+    def deactivate(self):
+        self.active = False
 
     def add_command(self, name, help_text):
         if name in self.app.commands:

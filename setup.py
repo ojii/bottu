@@ -16,6 +16,7 @@ setup(
         'wsgiref==0.1.2',
         'zope.interface',
         'redis',
+        'docopt'
     ],
     entry_points = {
         'console_scripts': [

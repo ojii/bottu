@@ -3,7 +3,7 @@ from bottu.environment import Environment
 from bottu.irc import User
 
 
-def help(env, command=None):
+def show_help(env, command=None):
     if command:
         try:
             cmd = env.app.commands[command]
@@ -26,12 +26,12 @@ def help(env, command=None):
 
 def grant(env, user, permission):
     if permission == '*':
-        permissions = env.app.permissions.keys()
+        perms = env.app.permissions.keys()
     else:
-        permissions = [permission]
-    for perm in permissions:
+        perms = [permission]
+    for perm in perms:
         try:
-            env.app.permissions[perm].grant(user)
+            env.app.grant_permission(user, permission)
         except KeyError:
             env.msg("Permission %s not found" % perm)
             return
@@ -40,12 +40,12 @@ def grant(env, user, permission):
 
 def revoke(env, user, permission):
     if permission == '*':
-        permissions = env.app.permissions.keys()
+        perms = env.app.permissions.keys()
     else:
-        permissions = [permission]
-    for perm in permissions:
+        perms = [permission]
+    for perm in perms:
         try:
-            env.app.permissions[perm].revoke(user)
+            env.app.revoke_permission(user, perm)
         except KeyError:
             env.msg("Permission %s not found" % perm)
             return
@@ -69,8 +69,46 @@ def listperms(env):
     )
 
 
+def activate_plugin(env, plugin):
+    if plugin.lower() == 'manage':
+        env.msg("Manage plugin is always active")
+    elif plugin in env.app.plugins:
+        env.app.plugins[plugin].activate()
+        env.msg("%s activated" % env.app.plugins[plugin].name)
+    else:
+        env.msg("Plugin %s not found" % plugin)
+
+
+def deactivate_plugin(env, plugin):
+    if plugin.lower() == 'manage':
+        env.msg("Manage plugin cannot be deactivated")
+    elif plugin in env.app.plugins:
+        env.app.plugins[plugin].deactivate()
+        env.msg("%s deactivated" % env.app.plugins[plugin].name)
+    else:
+        env.msg("Plugin %s not found" % plugin)
+
+
+def list_plugins(env):
+    active_plugins = sorted(
+        plugin.name for plugin in env.app.plugins.values() if plugin.active
+    )
+    inactive_plugins = sorted(
+        plugin.name for plugin in env.app.plugins.values() if not plugin.active
+    )
+    env.msg("Active plugins: %s" % (
+        ', '.join(active_plugins)
+        if active_plugins
+        else 'No active plugins'
+    ))
+    env.msg("Inactive plugins: %s" % (
+        ', '.join(inactive_plugins)
+        if inactive_plugins
+        else 'No inactive plugins'
+    ))
+
+
 def register(app):
-    #help_plugin = app.add_plugin("Help")
     perms_plugin = app.add_plugin("Permissions")
     admin = perms_plugin.add_permission('admin')
 
@@ -104,4 +142,21 @@ def register(app):
     help_plugin = app.add_plugin("Help")
     help_cmd = help_plugin.add_command('help', 'Displays help about commands')
     help_cmd.add_argument('command', default=None, nargs='?')
-    help_cmd.bind(help)
+    help_cmd.bind(show_help)
+
+    manage_plugin = app.add_plugin("Manage")
+    activate_cmd = manage_plugin.add_command('activate', 'Activate a plugin')
+    activate_cmd.add_argument('plugin')
+    activate_cmd.guard(admin)
+    activate_cmd.bind(activate_plugin)
+
+    deactivate_cmd = manage_plugin.add_command(
+        'deactivate', 'Deactivate a plugin'
+    )
+    deactivate_cmd.add_argument('plugin')
+    deactivate_cmd.guard(admin)
+    deactivate_cmd.bind(deactivate_plugin)
+
+    plugins_cmd = manage_plugin.add_command('plugins', 'List plugins')
+    plugins_cmd.guard(admin)
+    plugins_cmd.bind(list_plugins)

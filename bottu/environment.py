@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-namespace
 class Environment(object):
-    def __init__(self, app, plugin, user, channel):
+    def __init__(self, app, plugin, user, channel, target=None):
         self.app = app
         self.plugin = plugin
         self.prefix = self.plugin.name
         self.user = user
         self.channel = channel
-        self.target = self.channel or self.user
+        self.target = target
+        self.target = self.target or self.channel or self.user
 
     # IRC API
 

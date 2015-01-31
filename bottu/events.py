@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from bottu.environment import Environment
 from twisted.python import log
+
+from bottu.environment import Environment
 
 
 class Event(object):
@@ -10,9 +11,11 @@ class Event(object):
     def bind(self, callback, plugin):
         self.callbacks.append((callback, plugin))
 
-    def fire(self, app, user, channel, *args, **kwargs):
+    def fire(self, app, user, channel, target, *args, **kwargs):
         for callback, plugin in self.callbacks:
-            env = Environment(app, plugin, user, channel)
+            if not plugin.active:
+                continue
+            env = Environment(app, plugin, user, channel, target)
             try:
                 callback(env, *args, **kwargs)
             except Exception:

@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import shlex
-from bottu import flags
 import re
+
 from twisted.internet.protocol import ClientFactory
 from twisted.words.protocols.irc import IRCClient
 from twisted.python import log
+
+from bottu import flags
+from bottu.utils import Queued
 
 
 MODE_RE = re.compile(r'(?:(?P<op>@)|(?P<voice>\+))?(?P<nick>.+)')
@@ -32,6 +35,19 @@ class Channel(object):
     def msg(self, message):
         self.client.msg(self.name, message)
 
+    def is_active(self):
+        return self.name[1:] in self.client.app.channels
+
+
+class MultiChannel(object):
+    def __init__(self, client, channels):
+        self.client = client
+        self.channels = channels
+
+    def msg(self, message):
+        for channel in self.channels:
+            channel.msg(message)
+
 
 class User(Channel):
     @property
@@ -45,6 +61,17 @@ class BottuClient(IRCClient):
     """
     def __init__(self):
         self.user_mode_cache = {}
+        self.signed_on = False
+        self._active_channels = MultiChannel(self, [])
+
+    def _fire_event(self, name, user=None, channel=None, *args, **kwargs):
+        if channel and not channel.is_active():
+            target = self._active_channels
+        else:
+            target = None
+        self.app.fire_event(
+            name, user=user, channel=channel, target=target, *args, **kwargs
+        )
 
     def get_nickname(self):
         return self.app.name
@@ -54,18 +81,37 @@ class BottuClient(IRCClient):
     nickname = property(get_nickname, set_nickname)
 
     def signedOn(self):
+        self.signed_on = True
+        self._active_channels = MultiChannel(
+            self,
+            [Channel(self, '#%s' % name) for name in self.app.channels]
+        )
         log.msg("signed on")
         for channel in self.app.channels:
             self.join(channel)
             self.sendLine('NAMES %s' % channel)
+        self.join.ready()
+        self.msg.ready()
 
+    @Queued()
     def msg(self, user, message, length=None):
         """
         Send a message to a channel, enforces message encoding
         """
         encoded_message = unicode(message).encode('ascii', 'ignore')
-        log.msg("Sending %r to %r" % (encoded_message, user))
-        IRCClient.msg(self, user, encoded_message, length)
+        if user.startswith('#') and not Channel(self, user).is_active():
+            log.msg(
+                "ERROR: Trying to send message to inactive channel %s. "
+                "Message blocked!" % user
+            )
+        else:
+            log.msg("Sending %r to %r" % (encoded_message, user))
+            IRCClient.msg(self, user, encoded_message, length)
+
+    @Queued()
+    def join(self, channel, key=None):
+        log.msg("Joining %r" % channel)
+        IRCClient.join(self, channel, key)
 
     def joined(self, rawchannel):
         """
@@ -73,7 +119,7 @@ class BottuClient(IRCClient):
         """
         log.msg("joined: %s" % rawchannel)
         channel = Channel(self, rawchannel)
-        self.app.fire_event('joined', channel=channel)
+        self._fire_event('joined', channel=channel)
 
     def privmsg(self, rawuser, rawchannel, message):
         """
@@ -87,15 +133,21 @@ class BottuClient(IRCClient):
             channel = None
         else:
             channel = Channel(self, rawchannel)
-            self.app.fire_event('message', user=user, channel=channel, message=message)
-        try:
-            bits = shlex.split(message)
-        except ValueError:
-            bits = message.split(' ')
-        command_name = bits.pop(0) if bits else None
-        if command_name and command_name.startswith(self.app.command_prefix):
-            command_name = command_name[1:]
-            self.app.call_command(command_name, channel, user, bits)
+            self._fire_event(
+                'message',
+                user=user,
+                channel=channel,
+                message=message
+            )
+        if channel is None or channel.is_active():
+            try:
+                bits = shlex.split(message)
+            except ValueError:
+                bits = message.split(' ')
+            command_name = bits.pop(0) if bits else None
+            if command_name and command_name.startswith(self.app.command_prefix):
+                command_name = command_name[1:]
+                self.app.call_command(command_name, channel, user, bits)
 
     def irc_unknown(self, prefix, command, params):
         """
@@ -119,7 +171,7 @@ class BottuClient(IRCClient):
         log.msg("User %r joined %r" % (rawuser, rawchannel))
         channel = Channel(self, rawchannel)
         user = User(self, rawuser)
-        self.app.fire_event('user_joined', channel=channel, user=user)
+        self._fire_event('user_joined', channel=channel, user=user)
 
     def userRenamed(self, old, new):
         """
@@ -162,11 +214,20 @@ class BottuClientFactory(ClientFactory):
 
     def __init__(self, app):
         self.app = app
+        self.proto = None
+        self._queue = []
+
+    @Queued()
+    def join(self, channel):
+        self.proto.join(channel)
 
     def buildProtocol(self, addr):
         log.msg("Building protocol for %r" % addr)
         proto = ClientFactory.buildProtocol(self, addr)
         proto.app = self.app
+        proto.password = self.app.password
+        self.proto = proto
+        self.join.ready()
         return proto
 
     def clientConnectionLost(self, connector, reason):

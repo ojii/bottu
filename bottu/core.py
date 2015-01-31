@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
+
+from twisted.python import log
+from twisted.internet import reactor
+
 from bottu import builtin_commands
 from bottu.events import Event
 from bottu.irc import BottuClientFactory
-from twisted.python import log
-from twisted.internet import reactor
 from bottu.environment import Environment
 from bottu.plugins import load_plugins, Plugin
+from bottu.utils import Queued, CaseInsensitiveDict
 
 
 class RedisStorage(object):
@@ -30,7 +33,7 @@ class RedisStorage(object):
 
 class Application(object):
     def __init__(self, name, channels, network, port, redis_dsn,
-                 command_prefix='!', pluginconf=None):
+                 command_prefix='!', pluginconf=None, password=None):
         log.msg("Initializing")
         self.name = name
         self.channels = channels
@@ -39,10 +42,12 @@ class Application(object):
         self.redis_dsn = redis_dsn
         self.command_prefix = command_prefix
         self.pluginconf = pluginconf or {}
+        self.password = password
         self.commands = {}
         self.permissions = {}
-        self.plugins = {}
+        self.plugins = CaseInsensitiveDict()
         self.events = defaultdict(Event)
+        self.irc = None
         log.msg("Loading builtin plugins")
         builtin_commands.register(self)
         log.msg("Loading custom plugins")
@@ -53,19 +58,36 @@ class Application(object):
         log.msg("Attached storage")
 
     def bind_event(self, name, callback, plugin):
-        log.msg("Binding event %r with callback %r from %r" % (name, callback, plugin))
+        log.msg(
+            "Binding event %r with callback %r from %r" % (
+                name, callback, plugin
+            )
+        )
         self.events[name].bind(callback, plugin)
 
-    def fire_event(self, name, user=None, channel=None, *args, **kwargs):
-        log.msg("Firing event %r for user %r / channel %r, with args %r and kwargs %r" % (name, user, channel, args, kwargs))
-        self.events[name].fire(self, user, channel, *args, **kwargs)
+    def fire_event(self, name, user=None, channel=None, target=None,
+                   *args, **kwargs):
+        if channel and not channel.is_active():
+            name += '_passive'
+        log.msg(
+            "Firing event %r for user %r / channel %r, with args %r and "
+            "kwargs %r" % (name, user, channel, args, kwargs)
+        )
+        self.events[name].fire(self, user, channel, target, *args, **kwargs)
 
     def call_command(self, command_name, channel, user, bits):
-        log.msg("Calling command %r for channel %r/user %r, with args %r" % (command_name, channel, user, bits))
+        log.msg(
+            "Calling command %r for channel %r/user %r, with args %r" % (
+                command_name, channel, user, bits
+            )
+        )
         command = self.commands.get(command_name, None)
         if command:
             env = Environment(self, command.plugin, user, channel)
             command.execute(env, bits)
+        else:
+            log.msg("Command not found")
+            log.msg(self.commands.keys())
 
     def add_plugin(self, name):
         log.msg("Adding plugin %r" % name)
@@ -78,9 +100,20 @@ class Application(object):
         self.plugins[name] = plugin
         return plugin
 
+    def grant_permission(self, username, permission):
+        self.permissions[permission].grant(username)
+
+    def revoke_permission(self, username, permission):
+        self.permissions[permission].revoke(username)
+
+    @Queued()
+    def join_passive_channel(self, channel):
+        return self.irc.join(channel)
+
     def run(self):
         log.msg("Running bot as %r" % self.name)
         self.irc = BottuClientFactory(self)
+        self.join_passive_channel.ready()
         reactor.connectTCP(self.network, self.port, self.irc)
         reactor.run()
         log.msg("Stopping bot")

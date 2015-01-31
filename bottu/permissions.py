@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from bottu import flags
 from twisted.python import log
+
+from bottu import flags
 
 
 class Permission(object):
@@ -14,13 +15,15 @@ class Permission(object):
         if not env.user: # wtf, should never happen!!
             log.msg("No user, no idea how this happened, deny permission.")
             return False
-        log.msg("Checking user level %s against default %s" % (env.user.level, self.default))
+        log.msg("Checking user level %s against default %s" % (
+            env.user.level, self.default
+        ))
         if issubclass(env.user.level, self.default): # default guard
             log.msg("User matches default permission level")
             return True
         key = self.key(env.user.name)
         log.msg("Checking for permission key %r in ~perms" % key)
-        result =  self.app.storage.get('~perms', key, False)
+        result = self.app.storage.get('~perms', key, False)
         log.msg("Permission for key %r in ~perms: %s" % (key, result))
         return result
 
