@@ -32,6 +32,9 @@ class Channel(object):
         self.client = client
         self.name = name
 
+    def __repr__(self):
+        return '<Channel:%s>' % self.name
+
     def msg(self, message):
         self.client.msg(self.name, message)
 
@@ -43,6 +46,11 @@ class MultiChannel(object):
     def __init__(self, client, channels):
         self.client = client
         self.channels = channels
+
+    def __repr__(self):
+        return '<MultiChannel:%s>' % (
+            ', '.join(channel.name for channel in self.channels)
+        )
 
     def msg(self, message):
         for channel in self.channels:
@@ -73,12 +81,20 @@ class BottuClient(IRCClient):
             name, user=user, channel=channel, target=target, *args, **kwargs
         )
 
+    def sendLine(self, line):
+        log.msg('sendLine: %s' % line)
+        IRCClient.sendLine(self, line)
+
     def get_nickname(self):
         return self.app.name
 
     def set_nickname(self, val):
         self.app.name = val
     nickname = property(get_nickname, set_nickname)
+
+    @property
+    def username(self):
+        return self.nickname
 
     def signedOn(self):
         self.signed_on = True
@@ -87,6 +103,8 @@ class BottuClient(IRCClient):
             [Channel(self, '#%s' % name) for name in self.app.channels]
         )
         log.msg("signed on")
+        if self.app.password:
+            self.msg('NickServ', 'identify %s' % self.app.password)
         for channel in self.app.channels:
             self.join(channel)
             self.sendLine('NAMES %s' % channel)
@@ -162,7 +180,7 @@ class BottuClient(IRCClient):
         """
         Handles a RPL_NAMREPLY command, caches user modes
         """
-        log.msg("Handling namereploy %r %r %r %r" % (myname, channeltype, channelname, users))
+        log.msg("Handling namereply %r %r %r %r" % (myname, channeltype, channelname, users))
         for user in users.split(' '):
             nick, mode = split_user_mode(user)
             self.user_mode_cache[nick] = mode
@@ -208,6 +226,9 @@ class BottuClient(IRCClient):
     def level(self, nick):
         return self.user_mode_cache.get(nick, flags.ALL)
 
+    def notice(self, user, message):
+        log.msg('NOTICE %s %s' % (user, message))
+
 
 class BottuClientFactory(ClientFactory):
     protocol = BottuClient
@@ -225,7 +246,6 @@ class BottuClientFactory(ClientFactory):
         log.msg("Building protocol for %r" % addr)
         proto = ClientFactory.buildProtocol(self, addr)
         proto.app = self.app
-        proto.password = self.app.password
         self.proto = proto
         self.join.ready()
         return proto
