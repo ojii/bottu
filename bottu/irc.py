@@ -33,7 +33,7 @@ class Channel(object):
         self.name = name
 
     def __repr__(self):
-        return '<Channel:%s>' % self.name
+        return '<%s:%s>' % (self.__class__.__name__, self.name)
 
     def msg(self, message):
         self.client.msg(self.name, message)
