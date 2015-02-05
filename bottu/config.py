@@ -4,17 +4,12 @@ from yaml import loader
 DEFAULTS = {
     'redis_dsn': 'redis://127.0.0.1:6379/0'
 }
-TYPE_MAP = {
-    'port': int,
-    'name': str,
-    'channels': lambda channels: list(map(str, channels))
-}
 
 
 NULL = object()
 
 
-class SafeEnvLoader(loader.SafeLoader):
+class EnvLoader(loader.Loader):
     yaml_constructors = {}
 
     def __init__(self, stream):
@@ -22,7 +17,7 @@ class SafeEnvLoader(loader.SafeLoader):
         loader.Scanner.__init__(self)
         loader.Parser.__init__(self)
         loader.Composer.__init__(self)
-        loader.SafeConstructor.__init__(self)
+        loader.Constructor.__init__(self)
         loader.Resolver.__init__(self)
 
     @classmethod
@@ -37,17 +32,14 @@ class SafeEnvLoader(loader.SafeLoader):
 def constructor(instance, node):
     value = instance.construct_scalar(node)
     return os.environ.get(value, NULL)
-SafeEnvLoader.add_constructor('!env', constructor)
+EnvLoader.add_constructor('!env', constructor)
 
 
 def parse_config(stream):
     config = {}
     config.update(DEFAULTS)
     config.update({
-        key: value for key, value in SafeEnvLoader.load(stream).items()
+        key: value for key, value in EnvLoader.load(stream).items()
         if value is not NULL
     })
-    return {
-        key: TYPE_MAP.get(key, lambda x: x)(value)
-        for key, value in config.items()
-    }
+    return config
