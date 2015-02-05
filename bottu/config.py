@@ -1,5 +1,6 @@
 import os
-from yaml import loader
+
+import yaml
 
 DEFAULTS = {
     'redis_dsn': 'redis://127.0.0.1:6379/0'
@@ -9,37 +10,17 @@ DEFAULTS = {
 NULL = object()
 
 
-class EnvLoader(loader.Loader):
-    yaml_constructors = {}
-
-    def __init__(self, stream):
-        loader.Reader.__init__(self, stream)
-        loader.Scanner.__init__(self)
-        loader.Parser.__init__(self)
-        loader.Composer.__init__(self)
-        loader.Constructor.__init__(self)
-        loader.Resolver.__init__(self)
-
-    @classmethod
-    def load(cls, stream):
-        instance = cls(stream)
-        try:
-            return instance.get_single_data()
-        finally:
-            instance.dispose()
-
-
 def constructor(instance, node):
     value = instance.construct_scalar(node)
     return os.environ.get(value, NULL)
-EnvLoader.add_constructor('!env', constructor)
+yaml.add_constructor('!env', constructor)
 
 
 def parse_config(stream):
     config = {}
     config.update(DEFAULTS)
     config.update({
-        key: value for key, value in EnvLoader.load(stream).items()
+        key: value for key, value in yaml.load(stream).items()
         if value is not NULL
     })
     return config
